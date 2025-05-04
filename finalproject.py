@@ -1,10 +1,10 @@
 import pandas as pd
 
+#Load and clean the IMDB movie data
 def load_movie_data(file_path):
-    """Load and clean the IMDB movie data."""
     try:
         df = pd.read_csv(file_path)
-    except FileNotFoundError:
+    except FileNotFoundError: #make sure that the necessary dataset exists
         print("❌ File not found. Check the file path.")
         return None
 
@@ -12,25 +12,24 @@ def load_movie_data(file_path):
     df['Genre'] = df['Genre'].fillna('').apply(lambda g: [genre.strip() for genre in g.split(',')])
 
     # Drop rows with missing important data
-    df = df.dropna(subset=['Rating', 'Year', 'Runtime (Minutes)', 'Genre', 'Votes'])
+    df = df.dropna(subset=['Rating', 'Year', 'Runtime (Minutes)', 'Genre'])
 
     return df
 
+#Load the Oscar dataset from a CSV
 def load_oscar_data(file_path):
-    """Load the Oscar dataset from a CSV."""
     try:
         oscar_df = pd.read_csv(file_path)
-    except FileNotFoundError:
+    except FileNotFoundError: #same check as last time
         print("❌ Oscar data file not found.")
         return None
 
-    # Clean the Oscar dataset if needed (e.g., strip extra spaces)
+    # Clean the Oscar dataset (strip extra spaces)
     oscar_df['film'] = oscar_df['film'].str.strip()
     return oscar_df
 
-
+#Prompt user for movie preferences
 def get_user_preferences(df):
-    """Prompt user for movie preferences"""
 
     # Get unique list of genres from all movies
     all_genres = sorted(set(genre for genre_list in df['Genre'] for genre in genre_list))
@@ -43,7 +42,7 @@ def get_user_preferences(df):
             break
         elif genre in all_genres:
             break
-        else:
+        else: # user input an invalid genre
             while True:
                 see_genres = input(
                     "❌ Invalid genre. Would you like to see the list of available genres? (y/n): ").strip().lower()
@@ -57,7 +56,7 @@ def get_user_preferences(df):
                 else:
                     print("❌ Invalid response. Please type 'y' or 'n'.")
 
-    # Validate numeric inputs
+    # create function to validate numeric inputs
     def get_float_input(prompt, min_val=0.0, max_val=10.0):
         while True:
             val = input(prompt).strip()
@@ -72,6 +71,7 @@ def get_user_preferences(df):
             except ValueError:
                 print("❌ Invalid input. Please enter a number.")
 
+    # create function to validate integer inputs
     def get_int_input(prompt, min_val=None, max_val=None):
         while True:
             val = input(prompt).strip()
