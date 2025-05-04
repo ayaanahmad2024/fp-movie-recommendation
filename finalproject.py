@@ -5,7 +5,7 @@ def load_movie_data(file_path):
     try:
         df = pd.read_csv(file_path)
     except FileNotFoundError:
-        print("❌File not found. Check the file path.")
+        print("❌ File not found. Check the file path.")
         return None
 
     # Normalize Genre field: make sure each genre is separately searchable
@@ -16,15 +16,26 @@ def load_movie_data(file_path):
 
     return df
 
+def load_oscar_data(file_path):
+    """Load the Oscar dataset from a CSV."""
+    try:
+        oscar_df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print("❌ Oscar data file not found.")
+        return None
+
+    # Clean the Oscar dataset if needed (e.g., strip extra spaces)
+    oscar_df['film'] = oscar_df['film'].str.strip()
+    return oscar_df
+
 
 def get_user_preferences(df):
-
     """Prompt user for movie preferences"""
 
     # Get unique list of genres from all movies
     all_genres = sorted(set(genre for genre_list in df['Genre'] for genre in genre_list))
 
-    # get user preference for genre (and make sure they input a genre existing in dataset)
+    # Get user preference for genre (and make sure they input a genre existing in dataset)
     while True:
         genre = input("What genre are you in the mood for? (Action, Drama, Comedy, etc.): ").title()
         if genre == "":
@@ -34,7 +45,8 @@ def get_user_preferences(df):
             break
         else:
             while True:
-                see_genres = input("❌ Invalid genre. Would you like to see the list of available genres? (y/n): ").strip().lower()
+                see_genres = input(
+                    "❌ Invalid genre. Would you like to see the list of available genres? (y/n): ").strip().lower()
                 if see_genres == "y":
                     print("🎭 Available genres:")
                     print(", ".join(all_genres))
@@ -45,12 +57,11 @@ def get_user_preferences(df):
                 else:
                     print("❌ Invalid response. Please type 'y' or 'n'.")
 
-
     # Validate numeric inputs
     def get_float_input(prompt, min_val=0.0, max_val=10.0):
         while True:
             val = input(prompt).strip()
-            if val == "": # user skipped
+            if val == "":  # user skipped
                 return None
             try:
                 val = float(val)
@@ -64,7 +75,7 @@ def get_user_preferences(df):
     def get_int_input(prompt, min_val=None, max_val=None):
         while True:
             val = input(prompt).strip()
-            if val == "": # user skipped
+            if val == "":  # user skipped
                 return None
             try:
                 val = int(val)
@@ -88,7 +99,7 @@ def get_user_preferences(df):
 
     max_runtime = get_int_input("Maximum runtime in minutes (e.g. 120):", 50)
 
-    #get author input
+    # Get actor input
     fav_actor = input("Is there any actor or actress you really want to see? (Press Enter to skip): ").strip().title()
 
     return {
@@ -138,15 +149,34 @@ def filter_movies(df, prefs):
     return sorted_df
 
 
-def show_recommendations(recommendations, fav_actor = None):
+def check_oscar_status(movie_title, oscar_df):
+    """Check if a movie has been nominated or won an Oscar, and for which category."""
+    if oscar_df is not None:
+        # Check if movie is in the Oscar dataset and has a winner status
+        matched_rows = oscar_df[oscar_df['film'].str.contains(movie_title, case=False, na=False)]
+
+        if not matched_rows.empty:
+            oscar_info = []
+            for _, row in matched_rows.iterrows():
+                category = row['category']  # category from the dataset
+                winner = row['winner']
+                status = "Winner" if str(winner).strip().lower() == 'true' else "Nominated"
+                oscar_info.append(f"{status} for {category}")
+
+            return oscar_info  # Return a list of Oscar categories and statuses
+    return None
+
+
+def show_recommendations(recommendations, oscar_df, fav_actor=None):
     """Print top movie recommendations, allowing user to swap out ones they've already seen"""
 
-    #let user know if no matches found
+    # Let user know if no matches found
     if recommendations.empty:
         print("\n😔 Sorry, no movies matched your criteria.")
         return
 
-    top_matches = recommendations[['Title', 'Genre', 'Year', 'Rating', 'Runtime (Minutes)', 'Actors']].reset_index(drop=True)
+    top_matches = recommendations[['Title', 'Genre', 'Year', 'Rating', 'Runtime (Minutes)', 'Actors']].reset_index(
+        drop=True)
 
     display_limit = min(5, len(top_matches))  # Handle fewer than 5 matches
     display_indices = list(range(display_limit))
@@ -156,12 +186,16 @@ def show_recommendations(recommendations, fav_actor = None):
         print("\n🎥 Top Movie Recommendations:")
         for i, idx in enumerate(display_indices):
             movie = top_matches.iloc[idx]
+            oscar_info = check_oscar_status(movie['Title'], oscar_df)  # Oscar info
+            oscar_note = ""
+            if oscar_info:
+                oscar_note = " | " + ", ".join(oscar_info)  # Join all Oscar nominations/wins
             actor_note = ""
             if fav_actor and fav_actor.lower() in movie['Actors'].lower():
                 actor_note = f" (features {fav_actor})"
             print(
                 f"{i + 1}. {movie['Title']} ({int(movie['Year'])}) | {movie['Genre']} | "
-                f"{movie['Rating']}⭐ | {int(movie['Runtime (Minutes)'])} min{actor_note}"
+                f"{movie['Rating']}⭐ | {int(movie['Runtime (Minutes)'])} min{oscar_note}{actor_note}"
             )
 
         seen_input = input("\nHave you already seen any of these? (y/n): ").strip().lower()
@@ -199,17 +233,22 @@ def show_recommendations(recommendations, fav_actor = None):
 
         else:
             print("❌ Please enter 'y' or 'n'.")
-def main():
-    file_path = 'IMDB-Movie-Data.csv'  # Make sure this is in the same folder as your .py file
-    df = load_movie_data(file_path)
 
-    # start project with instructions
+def main():
+    movie_file_path = 'IMDB-Movie-Data.csv'  # Path to your movie details dataset
+    oscar_file_path = 'oscar_data.csv'  # Path to your Oscar dataset
+
+    movie_df = load_movie_data(movie_file_path)
+    oscar_df = load_oscar_data(oscar_file_path)
+
+    # Start project with instructions
     print('Welcome to movie recommender! 🎬✨\n')
     print("First, you'll go through a quick survey about your preferences. Feel free to click 'Enter' to skip\n")
-    if df is not None:
-        prefs = get_user_preferences(df)
-        recommendations = filter_movies(df, prefs)
-        show_recommendations(recommendations, prefs.get('fav_actor'))
+
+    if movie_df is not None and oscar_df is not None:
+        prefs = get_user_preferences(movie_df)
+        recommendations = filter_movies(movie_df, prefs)
+        show_recommendations(recommendations, oscar_df, prefs.get('fav_actor'))
 
 
 if __name__ == '__main__':
